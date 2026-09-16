@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Prospection locale — WebXStudio</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="description" content="Outil interne WebXStudio : balayage Google Maps des commerces locaux sans site web, scoring et suivi des appels." />
+<meta name="theme-color" content="#ECEFF3" />
+<meta name="color-scheme" content="light" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+<style>
+:root{
+  /* Relevé de terrain — papier froid, encre, un seul signal */
+  --papier:#ECEFF3;
+  --carte:#FFFFFF;
+  --encre:#16202B;
+  --encre-faible:#5C6B7A;
+  --trait:#D3DAE2;
+  --signal:#E2571F;      /* réservé : fiche sans site web */
+  --releve:#0D7C6B;      /* client gagné */
+  --alerte:#B4232A;
+
+  --r:3px;
+  --gouttiere:18px;
+  --chrome:'Barlow Condensed',system-ui,sans-serif;
+  --texte:'Instrument Sans',system-ui,-apple-system,sans-serif;
+  --donnee:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+}
+
+*{box-sizing:border-box}
+/* Les classes qui posent un display (.voile, .liste) l'emportent sinon sur [hidden]. */
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--papier);
+  color:var(--encre);
+  font-family:var(--texte);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--encre)}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- chrome : barre instrument ---------- */
+.barre{
+  display:flex;align-items:center;gap:20px;
+  padding:0 var(--gouttiere);height:52px;
+  background:var(--encre);color:var(--papier);
+  position:sticky;top:0;z-index:40;
+}
+.marque{font-family:var(--chrome);font-weight:700;font-size:19px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.marque span{color:var(--signal)}
+.barre-sep{flex:1}
+.compteur{font-family:var(--donnee);font-size:12px;color:#9FB1C2;white-space:nowrap}
+.compteur b{color:var(--papier);font-weight:700}
+.lien-chrome{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.1em;font-size:14px;
+  background:none;border:1px solid #3A4A5B;color:var(--papier);
+  padding:5px 11px;border-radius:var(--r);cursor:pointer;white-space:nowrap;
+}
+.lien-chrome:hover{border-color:var(--signal);color:var(--signal)}
+
+/* ---------- ossature ---------- */
+.ossature{
+  display:grid;grid-template-columns:330px minmax(0,1fr);
+  gap:var(--gouttiere);padding:var(--gouttiere);
+  max-width:1560px;margin:0 auto;align-items:start;
+}
+.colonne-gauche{display:flex;flex-direction:column;gap:var(--gouttiere);position:sticky;top:70px}
+.bloc{background:var(--carte);border:1px solid var(--trait);border-radius:var(--r)}
+.bloc-titre{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.12em;
+  font-size:14px;font-weight:600;color:var(--encre-faible);
+  padding:11px 14px;border-bottom:1px solid var(--trait);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.bloc-corps{padding:14px}
+
+/* ---------- formulaire ---------- */
+.champ{display:block;margin-bottom:12px}
+.champ-label{
+  display:block;font-family:var(--chrome);text-transform:uppercase;letter-spacing:.1em;
+  font-size:13px;font-weight:600;color:var(--encre-faible);margin-bottom:5px;
+}
+.saisie,.liste-deroulante{
+  width:100%;padding:8px 10px;background:var(--papier);
+  border:1px solid var(--trait);border-radius:var(--r);
+}
+.saisie:focus,.liste-deroulante:focus{background:var(--carte);border-color:var(--encre-faible)}
+.metiers{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.puce{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.06em;font-size:13px;
+  padding:3px 8px;background:var(--papier);border:1px solid var(--trait);
+  border-radius:var(--r);cursor:pointer;
+}
+.puce:hover{border-color:var(--signal);color:var(--signal)}
+.bouton{
+  width:100%;padding:11px;background:var(--encre);color:var(--papier);
+  border:1px solid var(--encre);border-radius:var(--r);cursor:pointer;
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.12em;font-size:16px;font-weight:600;
+}
+.bouton:hover:not(:disabled){background:var(--signal);border-color:var(--signal)}
+.bouton:disabled{opacity:.45;cursor:not-allowed}
+.bouton-fin{
+  padding:6px 10px;background:none;border:1px solid var(--trait);border-radius:var(--r);
+  cursor:pointer;font-family:var(--chrome);text-transform:uppercase;letter-spacing:.08em;font-size:13px;
+  color:var(--encre-faible);
+}
+.bouton-fin:hover{border-color:var(--encre);color:var(--encre)}
+.rangee{display:flex;gap:8px}
+.rangee>*{flex:1}
+
+/* ---------- compteurs ---------- */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--trait)}
+.stat{background:var(--carte);padding:11px 14px}
+.stat-val{font-family:var(--donnee);font-size:22px;font-weight:700;line-height:1}
+.stat-lib{font-family:var(--chrome);text-transform:uppercase;letter-spacing:.09em;font-size:12px;color:var(--encre-faible);margin-top:3px}
+.stat-signal .stat-val{color:var(--signal)}
+.stat-client .stat-val{color:var(--releve)}
+
+/* ---------- prochain appel : la signature ---------- */
+.appel{
+  background:var(--encre);color:var(--papier);
+  border-radius:var(--r);padding:20px 22px;margin-bottom:var(--gouttiere);
+}
+.appel-eyebrow{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.2em;
+  font-size:13px;color:var(--signal);margin-bottom:10px;
+}
+.appel-nom{font-family:var(--chrome);font-size:34px;font-weight:700;line-height:1.05;letter-spacing:.01em}
+.appel-meta{color:#9FB1C2;font-size:14px;margin-top:4px}
+.appel-tel{
+  display:inline-block;font-family:var(--donnee);font-size:29px;font-weight:700;
+  color:var(--papier);text-decoration:none;margin:14px 0 4px;letter-spacing:-.01em;
+}
+.appel-tel:hover{color:var(--signal)}
+.appel-sanstel{font-family:var(--donnee);font-size:17px;color:#9FB1C2;margin:14px 0 4px}
+.appel-angle{
+  border-left:2px solid var(--signal);padding-left:11px;margin:12px 0 16px;
+  color:#C6D3DF;font-size:14px;
+}
+.appel-actions{display:flex;flex-wrap:wrap;gap:7px}
+.issue{
+  background:none;border:1px solid #3A4A5B;color:var(--papier);
+  padding:7px 12px;border-radius:var(--r);cursor:pointer;
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.08em;font-size:14px;
+  display:inline-flex;align-items:center;gap:7px;
+}
+.issue:hover{border-color:var(--signal);color:var(--signal)}
+.issue kbd{
+  font-family:var(--donnee);font-size:11px;background:#31404F;color:#C6D3DF;
+  padding:1px 5px;border-radius:2px;
+}
+.appel-vide{text-align:center;padding:14px 0}
+.appel-vide p{color:#9FB1C2;margin:6px 0 0}
+
+/* ---------- filtres ---------- */
+.filtres{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  padding:10px 12px;margin-bottom:var(--gouttiere);
+}
+.filtres .saisie,.filtres .liste-deroulante{width:auto;flex:0 1 auto;padding:6px 9px;font-size:14px}
+.filtres-recherche{flex:1 1 180px}
+.bascule{display:inline-flex;align-items:center;gap:6px;font-size:14px;white-space:nowrap;cursor:pointer}
+.onglets{display:flex;gap:0;margin-left:auto;border:1px solid var(--trait);border-radius:var(--r);overflow:hidden}
+.onglet{
+  background:var(--carte);border:none;padding:6px 13px;cursor:pointer;
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.08em;font-size:14px;color:var(--encre-faible);
+}
+.onglet[aria-selected="true"]{background:var(--encre);color:var(--papier)}
+
+/* ---------- fiches ---------- */
+.liste{display:flex;flex-direction:column;gap:9px;list-style:none;margin:0;padding:0}
+.fiche{
+  background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  padding:13px 15px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:start;
+}
+.fiche.sans-site{border-left:3px solid var(--signal)}
+.fiche.est-client{border-left:3px solid var(--releve)}
+.fiche-nom{font-family:var(--chrome);font-size:21px;font-weight:600;line-height:1.15;margin:0}
+.fiche-meta{color:var(--encre-faible);font-size:13.5px;margin-top:2px}
+.fiche-liens{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.etiquette{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.07em;font-size:13px;
+  border:1px solid var(--trait);border-radius:var(--r);padding:2px 8px;
+  text-decoration:none;color:var(--encre-faible);display:inline-flex;align-items:center;gap:5px;
+}
+a.etiquette:hover{border-color:var(--encre);color:var(--encre)}
+.etiquette-signal{border-color:var(--signal);color:var(--signal);font-weight:600}
+.fiche-droite{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:150px}
+.score{font-family:var(--donnee);font-size:25px;font-weight:700;line-height:1}
+.score small{font-size:12px;color:var(--encre-faible);font-weight:400}
+
+/* jauge de signal : 4 segments */
+.jauge{display:flex;gap:2px;width:150px}
+.segment{height:6px;background:var(--trait);border-radius:1px;position:relative;overflow:hidden}
+.segment i{position:absolute;inset:0;transform-origin:left;background:var(--encre);display:block}
+.segment-site i{background:var(--signal)}
+.selecteur-statut{
+  font-family:var(--chrome);text-transform:uppercase;letter-spacing:.07em;font-size:13px;
+  padding:4px 7px;background:var(--papier);border:1px solid var(--trait);border-radius:var(--r);cursor:pointer;
+}
+.note-fiche{
+  grid-column:1/-1;width:100%;resize:vertical;min-height:0;height:34px;
+  padding:6px 9px;background:var(--papier);border:1px solid var(--trait);border-radius:var(--r);font-size:14px;
+}
+.note-fiche:focus{background:var(--carte)}
+
+/* ---------- carte ---------- */
+#carte{height:620px;border:1px solid var(--trait);border-radius:var(--r);background:var(--carte)}
+
+/* ---------- vides / journal ---------- */
+.vide{
+  background:var(--carte);border:1px dashed var(--trait);border-radius:var(--r);
+  padding:42px 24px;text-align:center;
+}
+.vide h2{font-family:var(--chrome);text-transform:uppercase;letter-spacing:.1em;font-size:20px;margin:0 0 7px}
+.vide p{color:var(--encre-faible);margin:0 auto;max-width:44ch}
+.journal{
+  font-family:var(--donnee);font-size:12px;color:var(--encre-faible);
+  padding:9px 12px;background:var(--carte);border:1px solid var(--trait);
+  border-radius:var(--r);margin-bottom:var(--gouttiere);
+}
+.journal.erreur{border-color:var(--alerte);color:var(--alerte)}
+
+/* ---------- panneau clé ---------- */
+.voile{
+  position:fixed;inset:0;background:rgba(22,32,43,.72);
+  display:flex;align-items:center;justify-content:center;padding:20px;z-index:60;
+}
+.panneau{
+  background:var(--carte);border-radius:var(--r);max-width:560px;width:100%;
+  max-height:88vh;overflow:auto;padding:26px 28px;
+}
+.panneau h2{font-family:var(--chrome);text-transform:uppercase;letter-spacing:.1em;font-size:23px;margin:0 0 4px}
+.panneau p{color:var(--encre-faible);font-size:14px}
+.panneau ol{color:var(--encre-faible);font-size:14px;padding-left:19px}
+.panneau li{margin-bottom:5px}
+.panneau code{font-family:var(--donnee);font-size:12.5px;background:var(--papier);padding:1px 5px;border-radius:2px;color:var(--encre)}
+.avertissement{border-left:2px solid var(--signal);padding-left:11px;font-size:13.5px;color:var(--encre-faible);margin:16px 0}
+
+@media (max-width:1040px){
+  .ossature{grid-template-columns:1fr}
+  /* Au quotidien la base est déjà constituée : la file d'appels passe avant
+     le formulaire de balayage. */
+  .colonne-droite{order:1}
+  .colonne-gauche{order:2;position:static}
+  .appel-nom{font-size:27px}
+  .appel-tel{font-size:25px}
+  .fiche{grid-template-columns:1fr}
+  .fiche-droite{align-items:flex-start;flex-direction:row;flex-wrap:wrap;align-items:center}
+}
+@media (max-width:700px){
+  /* la barre ne peut pas tenir sur une ligne : elle se replie, les chiffres
+     restent lisibles dans le bloc Base. */
+  .barre{height:auto;flex-wrap:wrap;gap:8px;padding:9px var(--gouttiere)}
+  .barre-sep,.compteur{display:none}
+  .marque{font-size:17px}
+  .lien-chrome{font-size:13px;padding:4px 9px}
+  .colonne-gauche{top:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="barre">
+  <div class="marque">WEBX<span>STUDIO</span></div>
+  <div class="compteur" id="compteur-base">base vide</div>
+  <div class="barre-sep"></div>
+  <button class="lien-chrome" id="btn-exporter-csv" type="button">Exporter CSV</button>
+  <button class="lien-chrome" id="btn-sauvegarde" type="button">Sauvegarde</button>
+  <button class="lien-chrome" id="btn-diag" type="button">Diagnostic</button>
+  <button class="lien-chrome" id="btn-cle" type="button">Clé API</button>
+</header>
+
+<main class="ossature">
+  <div class="colonne-gauche">
+
+    <section class="bloc">
+      <h2 class="bloc-titre">Balayage</h2>
+      <div class="bloc-corps">
+        <label class="champ">
+          <span class="champ-label">Métier</span>
+          <input class="saisie" id="saisie-metier" type="text" placeholder="coiffeur, garage, restaurant…" autocomplete="off" />
+        </label>
+        <div class="metiers" id="metiers-rapides"></div>
+        <label class="champ">
+          <span class="champ-label">Commune</span>
+          <input class="saisie" id="saisie-commune" type="text" placeholder="Toulon" autocomplete="off" />
+        </label>
+        <label class="champ">
+          <span class="champ-label">Rayon : <span id="valeur-rayon">10</span> km</span>
+          <input class="saisie" id="saisie-rayon" type="range" min="1" max="50" value="10" step="1" />
+        </label>
+        <button class="bouton" id="btn-balayer" type="button">Lancer le balayage</button>
+      </div>
+    </section>
+
+    <section class="bloc">
+      <h2 class="bloc-titre">Base</h2>
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="stat-total">0</div><div class="stat-lib">Prospects</div></div>
+        <div class="stat stat-signal"><div class="stat-val" id="stat-sans-site">0</div><div class="stat-lib">Sans site</div></div>
+        <div class="stat"><div class="stat-val" id="stat-appeles">0</div><div class="stat-lib">Appelés</div></div>
+        <div class="stat stat-client"><div class="stat-val" id="stat-clients">0</div><div class="stat-lib">Clients</div></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="colonne-droite">
+    <div id="journal" class="journal" hidden></div>
+    <section id="zone-appel" aria-live="polite"></section>
+
+    <div class="filtres">
+      <input class="saisie filtres-recherche" id="filtre-texte" type="search" placeholder="Filtrer par nom ou adresse" />
+      <label class="bascule"><input type="checkbox" id="filtre-sans-site" /> Sans site seulement</label>
+      <select class="liste-deroulante" id="filtre-statut" aria-label="Filtrer par statut">
+        <option value="">Tous statuts</option>
+        <option value="nouveau">Nouveau</option>
+        <option value="a_appeler">À appeler</option>
+        <option value="appele">Appelé</option>
+        <option value="rdv">RDV</option>
+        <option value="client">Client</option>
+        <option value="perdu">Perdu</option>
+      </select>
+      <select class="liste-deroulante" id="filtre-tri" aria-label="Trier">
+        <option value="score">Tri : score</option>
+        <option value="avis">Tri : avis</option>
+        <option value="note">Tri : note</option>
+        <option value="nom">Tri : nom</option>
+      </select>
+      <div class="onglets" role="tablist">
+        <button class="onglet" id="onglet-liste" role="tab" aria-selected="true" type="button">Liste</button>
+        <button class="onglet" id="onglet-carte" role="tab" aria-selected="false" type="button">Carte</button>
+      </div>
+    </div>
+
+    <ul class="liste" id="liste-prospects"></ul>
+    <div id="carte" hidden></div>
+  </div>
+</main>
+
+<div class="voile" id="voile-cle" hidden>
+  <div class="panneau" role="dialog" aria-modal="true" aria-labelledby="titre-cle">
+    <h2 id="titre-cle">Clé Google Maps</h2>
+    <p>La clé reste dans le stockage local de ce navigateur. Elle n'est jamais envoyée ailleurs qu'à Google, et elle n'est pas enregistrée dans le dépôt.</p>
+    <label class="champ">
+      <span class="champ-label">Clé API</span>
+      <input class="saisie" id="saisie-cle" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+    </label>
+    <div class="avertissement">
+      Restreins cette clé avant de t'en servir : dans Google Cloud, limite-la au référent HTTP de ce site et n'autorise que <code>Maps JavaScript API</code>, <code>Places API (New)</code> et <code>Geocoding API</code>. Sans restriction, une clé publiée est utilisable par n'importe qui, à tes frais.
+    </div>
+    <ol>
+      <li>Console Google Cloud → APIs &amp; Services → Credentials.</li>
+      <li>Active les trois API ci-dessus sur le projet.</li>
+      <li>Crée une clé, puis Application restrictions → Websites → ajoute ce domaine.</li>
+      <li>Colle la clé ici. Chaque balayage compte pour une requête facturée.</li>
+    </ol>
+    <div class="rangee">
+      <button class="bouton" id="btn-enregistrer-cle" type="button">Enregistrer et charger</button>
+      <button class="bouton-fin" id="btn-fermer-cle" type="button">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="import-fichier" accept="application/json" hidden />
+
+<script>
+(function(){
+'use strict';
+
+/* ================= stockage local ================= */
+var CLE_BASE='wxs.prospects.v1', CLE_API='wxs.cle.v1';
+var base={}, carte=null, marqueurs=[], googlePret=false, balayageEnCours=false;
+
+function lire(cle,defaut){
+  try{ var b=localStorage.getItem(cle); return b?JSON.parse(b):defaut; }catch(e){ return defaut; }
+}
+function ecrire(cle,val){
+  try{ localStorage.setItem(cle,JSON.stringify(val)); return true; }
+  catch(e){ journal('Stockage indisponible : la base ne sera pas conservée.',true); return false; }
+}
+function lireCle(){ try{ return localStorage.getItem(CLE_API)||''; }catch(e){ return ''; } }
+
+/* ================= scoring =================
+   Le prospect idéal d'un studio web : un commerce qui tourne
+   (avis, bonne note, joignable) mais qui n'a pas de vitrine en ligne. */
+var PLAFONDS={site:45,traction:30,joignable:15,fiche:10};
+var RESEAUX=/facebook\.|instagram\.|linktr\.ee|pagesjaunes\.|tiktok\.|twitter\.|x\.com|linkedin\./i;
+
+function typeDeSite(p){
+  if(!p.site) return 'aucun';
+  if(RESEAUX.test(p.site)) return 'reseau';
+  return 'propre';
+}
+function scorer(p){
+  var t=typeDeSite(p);
+  var site = t==='aucun' ? 45 : (t==='reseau' ? 28 : 0);
+
+  var avis=p.avis||0, note=p.note||0, traction;
+  if(avis===0) traction=4;
+  else if(avis<10) traction=12;
+  else if(avis<200) traction=22;
+  else traction=14;
+  if(avis>=5){
+    if(note>=4.2) traction+=8;
+    else if(note>=3.5) traction+=4;
+  }
+  traction=Math.min(traction,PLAFONDS.traction);
+
+  var joignable = p.tel ? 15 : 0;
+  var fiche = (p.horaires?6:0) + (p.categorie?4:0);
+
+  return {site:site,traction:traction,joignable:joignable,fiche:fiche,
+          total:site+traction+joignable+fiche};
+}
+
+/* Une phrase d'accroche tirée des données, pas un slogan. */
+function angle(p){
+  var t=typeDeSite(p), preuve='';
+  if(p.avis) preuve=' '+(p.note?fmtNote(p.note)+'★ sur '+p.avis+' avis':p.avis+' avis')+' : la clientèle est là';
+  if(t==='aucun') return 'Aucun site web.'+(preuve?preuve+', la vitrine manque.':'');
+  if(t==='reseau') return 'Pas de vrai site : seulement un profil réseau social comme vitrine.'+(preuve?preuve+'.':'');
+  return 'Site déjà en ligne — à qualifier en refonte ou référencement local.';
+}
+
+/* ================= utilitaires ================= */
+function fmtNote(n){ return (Math.round(n*10)/10).toString().replace('.',','); }
+function echapper(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function hote(url){ try{ return new URL(url).hostname.replace(/^www\./,''); }catch(e){ return url; } }
+
+var STATUTS={nouveau:'Nouveau',a_appeler:'À appeler',appele:'Appelé',rdv:'RDV',client:'Client',perdu:'Perdu'};
+
+function journal(msg,erreur){
+  var el=document.getElementById('journal');
+  el.textContent=msg; el.hidden=false;
+  el.classList.toggle('erreur',!!erreur);
+}
+function effacerJournal(){ document.getElementById('journal').hidden=true; }
+
+/* ================= chargement de l'API Google ================= */
+/* Quand Google refuse une clé il appelle gm_authFailure et n'appelle JAMAIS
+   le callback de chargement : sans minuteur la promesse resterait suspendue
+   et l'interface se figerait sans rien dire. */
+var chargementGoogle=null, erreurAuth='', codeGoogle='';
+
+/* Google écrit le motif exact du refus dans la console (et seulement là).
+   On l'intercepte pour pouvoir l'afficher dans l'interface. */
+(function(){
+  var origine=console.error;
+  console.error=function(){
+    var t=Array.prototype.join.call(arguments,' ');
+    var m=t.match(/Google Maps JavaScript API (?:error|warning):\s*([A-Za-z]+)/);
+    if(m) codeGoogle=m[1];
+    return origine.apply(console,arguments);
+  };
+})();
+
+var MOTIFS={
+  RefererNotAllowedMapError:"cette adresse n'est pas dans les référents autorisés de la clé. "
+    +"Ajoute exactement « ORIGINE/* » dans Google Cloud > Credentials > ta clé > "
+    +"Application restrictions > Websites. Compte jusqu'à 5 minutes de propagation.",
+  ApiNotActivatedMapError:"l'API « Maps JavaScript API » n'est pas activée sur le projet. "
+    +"Google Cloud > APIs & Services > Library > active-la.",
+  ApiTargetBlockedMapError:"la clé est restreinte à certaines API, et « Maps JavaScript API » "
+    +"n'en fait pas partie. Ta clé > API restrictions > ajoute Maps JavaScript API, "
+    +"Places API (New) et Geocoding API.",
+  BillingNotEnabledMapError:"la facturation n'est pas activée sur le projet. Google l'exige "
+    +"pour Maps, même dans le crédit gratuit : Google Cloud > Billing > lier un compte.",
+  InvalidKeyMapError:"la clé est invalide : recopie-la entière depuis Google Cloud.",
+  MissingKeyMapError:"aucune clé n'a été transmise.",
+  ExpiredKeyMapError:"la clé a expiré ou a été révoquée."
+};
+
+window.gm_authFailure=function(){
+  googlePret=false; chargementGoogle=null;
+  var origine=location.origin;
+  if(codeGoogle && MOTIFS[codeGoogle]){
+    erreurAuth=codeGoogle+" \u2014 "+MOTIFS[codeGoogle].replace('ORIGINE',origine);
+  }else{
+    erreurAuth="Google a refusé la clé"+(codeGoogle?" ("+codeGoogle+")":"")+". "
+      +"À vérifier dans l'ordre : Maps JavaScript API, Places (New) et Geocoding activées ; "
+      +"les référents autorisent "+origine+"/* ; la facturation est active ; la clé est entière.";
+  }
+  journal(erreurAuth,true);
+  relacherBouton();
+};
+
+function relacherBouton(){
+  balayageEnCours=false;
+  var b=document.getElementById('btn-balayer');
+  if(b){ b.disabled=false; b.textContent='Lancer le balayage'; }
+}
+
+function chargerGoogle(cle){
+  if(googlePret) return Promise.resolve();
+  if(!cle) return Promise.reject(new Error('Aucune clé enregistrée.'));
+  if(chargementGoogle) return chargementGoogle;
+
+  chargementGoogle=new Promise(function(resolve,reject){
+    var minuteur=setTimeout(function(){
+      chargementGoogle=null;
+      reject(new Error(erreurAuth||"Google Maps n'a pas répondu en 15 secondes : "
+        +"clé, API activées ou connexion."));
+    },15000);
+    window.__wxsPret=function(){ clearTimeout(minuteur); googlePret=true; resolve(); };
+    var s=document.createElement('script');
+    s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(cle)
+        +'&v=weekly&language=fr&region=FR&loading=async'
+        +'&libraries=places,geocoding,maps&callback=__wxsPret';
+    s.async=true;
+    s.onerror=function(){
+      clearTimeout(minuteur); chargementGoogle=null;
+      reject(new Error("Le script Google Maps n'a pas pu être chargé. Vérifie la connexion."));
+    };
+    document.head.appendChild(s);
+  });
+  return chargementGoogle;
+}
+
+/* Les bibliothèques sont demandées dans l'URL : on les prend directement,
+   importLibrary ne sert que de repli. */
+async function geocodeur(){
+  if(window.google && google.maps && google.maps.Geocoder) return new google.maps.Geocoder();
+  var lib=await google.maps.importLibrary('geocoding');
+  return new lib.Geocoder();
+}
+async function lieux(){
+  if(window.google && google.maps && google.maps.places && google.maps.places.Place)
+    return google.maps.places;
+  return await google.maps.importLibrary('places');
+}
+
+/* ================= balayage ================= */
+var CHAMPS=['id','displayName','formattedAddress','location','rating','userRatingCount',
+            'websiteURI','nationalPhoneNumber','businessStatus','primaryTypeDisplayName',
+            'googleMapsURI','regularOpeningHours'];
+
+function versProspect(lieu){
+  var loc=lieu.location;
+  return {
+    id:lieu.id,
+    nom:(lieu.displayName||'Sans nom'),
+    adresse:lieu.formattedAddress||'',
+    tel:lieu.nationalPhoneNumber||'',
+    site:lieu.websiteURI||'',
+    note:lieu.rating||0,
+    avis:lieu.userRatingCount||0,
+    categorie:lieu.primaryTypeDisplayName||'',
+    maps:lieu.googleMapsURI||'',
+    horaires:!!lieu.regularOpeningHours,
+    actif:lieu.businessStatus!=='CLOSED_PERMANENTLY',
+    lat:loc?(typeof loc.lat==='function'?loc.lat():loc.lat):null,
+    lng:loc?(typeof loc.lng==='function'?loc.lng():loc.lng):null,
+    statut:'nouveau', notes:'', contact:'', ajoute:Date.now(), passe:0
+  };
+}
+
+async function balayer(){
+  if(balayageEnCours) return;
+  var metier=document.getElementById('saisie-metier').value.trim();
+  var commune=document.getElementById('saisie-commune').value.trim();
+  var rayon=parseInt(document.getElementById('saisie-rayon').value,10);
+
+  if(!metier || !commune){ journal('Renseigne un métier et une commune avant de balayer.',true); return; }
+  var cle=lireCle();
+  if(!cle){ ouvrirCle(); return; }
+
+  balayageEnCours=true;
+  var bouton=document.getElementById('btn-balayer');
+  bouton.disabled=true; bouton.textContent='Balayage…';
+  journal('Balayage de '+metier+' autour de '+commune+'…');
+
+  try{
+    await chargerGoogle(cle);
+    var reponse=await (await geocodeur()).geocode({address:commune,region:'fr'});
+    if(!reponse.results.length) throw new Error('Commune introuvable : '+commune);
+    var centre=reponse.results[0].geometry.location;
+
+    var res=await (await lieux()).Place.searchByText({
+      textQuery:metier+' '+commune,
+      fields:CHAMPS,
+      locationBias:{center:centre,radius:Math.min(rayon*1000,50000)},
+      maxResultCount:20, language:'fr', region:'fr'
+    });
+
+    var nouveaux=0, connus=0;
+    (res.places||[]).forEach(function(lieu){
+      var p=versProspect(lieu);
+      if(!p.actif) return;
+      if(base[p.id]){ connus++; return; }
+      base[p.id]=p; nouveaux++;
+    });
+    ecrire(CLE_BASE,base);
+    journal(nouveaux+' nouveau'+(nouveaux>1?'x':'')+' prospect'+(nouveaux>1?'s':'')
+      +' ajouté'+(nouveaux>1?'s':'')+' à la base'
+      +(connus?', '+connus+' déjà connu'+(connus>1?'s':''):'')
+      +'. Google renvoie 20 fiches par balayage : relance avec une autre commune ou un métier voisin pour élargir.');
+    rendre();
+  }catch(e){
+    var d=(e && e.message) ? e.message : 'Le balayage a échoué.';
+    if(e && e.name && e.name!=='Error') d=e.name+' : '+d;
+    journal(d,true);
+  }finally{
+    relacherBouton();
+  }
+}
+
+/* ================= sélection affichée ================= */
+function filtrer(){
+  var texte=document.getElementById('filtre-texte').value.trim().toLowerCase();
+  var sansSite=document.getElementById('filtre-sans-site').checked;
+  var statut=document.getElementById('filtre-statut').value;
+  var tri=document.getElementById('filtre-tri').value;
+
+  var liste=Object.keys(base).map(function(id){ return base[id]; }).filter(function(p){
+    if(sansSite && typeDeSite(p)==='propre') return false;
+    if(statut && p.statut!==statut) return false;
+    if(texte && (p.nom+' '+p.adresse).toLowerCase().indexOf(texte)===-1) return false;
+    return true;
+  });
+
+  liste.sort(function(a,b){
+    if(tri==='nom') return a.nom.localeCompare(b.nom,'fr');
+    if(tri==='note') return (b.note||0)-(a.note||0);
+    if(tri==='avis') return (b.avis||0)-(a.avis||0);
+    var ecart=scorer(b).total-scorer(a).total;
+    return ecart!==0 ? ecart : (b.avis||0)-(a.avis||0);
+  });
+  return liste;
+}
+
+/* ================= jauge de signal ================= */
+function jauge(s){
+  var segs=[['site','Site',s.site,PLAFONDS.site],
+            ['traction','Traction',s.traction,PLAFONDS.traction],
+            ['joignable','Tel',s.joignable,PLAFONDS.joignable],
+            ['fiche','Fiche',s.fiche,PLAFONDS.fiche]];
+  var barres=segs.map(function(g){
+    return '<span class="segment segment-'+g[0]+'" style="flex:'+g[3]+'">'
+         + '<i style="transform:scaleX('+(g[2]/g[3]).toFixed(3)+')"></i></span>';
+  }).join('');
+  var detail=segs.map(function(g){ return g[1]+' '+g[2]+'/'+g[3]; }).join(' \u00b7 ');
+  return '<div class="jauge" role="img" title="'+detail+'" aria-label="Signal : '+detail+'">'+barres+'</div>';
+}
+
+/* ================= prochain appel ================= */
+function prochain(liste){
+  var file=liste.filter(function(p){
+    return (p.statut==='nouveau'||p.statut==='a_appeler');
+  });
+  file.sort(function(a,b){
+    if(a.passe!==b.passe) return a.passe-b.passe;
+    var ecart=scorer(b).total-scorer(a).total;
+    return ecart!==0 ? ecart : (b.avis||0)-(a.avis||0);
+  });
+  return file[0]||null;
+}
+
+function rendreAppel(liste){
+  var zone=document.getElementById('zone-appel');
+  var p=prochain(liste);
+  if(!p){
+    var vide=Object.keys(base).length===0;
+    zone.innerHTML='<div class="appel"><div class="appel-eyebrow">Prochain appel</div>'
+      +'<div class="appel-vide"><div class="appel-nom">'
+      +(vide?'La base est vide':'File d’appels terminée')+'</div>'
+      +'<p>'+(vide?'Lance un balayage : métier, commune, rayon.'
+                  :'Tous les prospects filtrés ont été traités. Change de filtre ou balaye une autre commune.')
+      +'</p></div></div>';
+    return;
+  }
+  var s=scorer(p);
+  zone.innerHTML='<div class="appel">'
+    +'<div class="appel-eyebrow">Prochain appel — signal '+s.total+'/100</div>'
+    +'<div class="appel-nom">'+echapper(p.nom)+'</div>'
+    +'<div class="appel-meta">'+echapper(p.categorie||'—')+(p.adresse?' · '+echapper(p.adresse):'')+'</div>'
+    +(p.tel?'<a class="appel-tel" href="tel:'+echapper(p.tel.replace(/\s/g,''))+'">'+echapper(p.tel)+'</a>'
+           :'<div class="appel-sanstel">Pas de téléphone sur la fiche</div>')
+    +'<div class="appel-angle">'+echapper(angle(p))+'</div>'
+    +'<div class="appel-actions" data-id="'+echapper(p.id)+'">'
+      +'<button class="issue" data-issue="appele" type="button"><kbd>A</kbd> Appelé</button>'
+      +'<button class="issue" data-issue="rdv" type="button"><kbd>R</kbd> RDV obtenu</button>'
+      +'<button class="issue" data-issue="client" type="button"><kbd>C</kbd> Client</button>'
+      +'<button class="issue" data-issue="perdu" type="button"><kbd>P</kbd> Sans suite</button>'
+      +'<button class="issue" data-issue="passer" type="button"><kbd>S</kbd> Passer</button>'
+    +'</div></div>';
+}
+
+/* ================= liste ================= */
+function rendreListe(liste){
+  var ul=document.getElementById('liste-prospects');
+  if(!liste.length){
+    ul.innerHTML='<li class="vide"><h2>Aucun prospect</h2><p>'
+      +(Object.keys(base).length?'Aucune fiche ne correspond aux filtres. Élargis la sélection.'
+                                :'Renseigne un métier et une commune, puis lance le balayage.')
+      +'</p></li>';
+    return;
+  }
+  ul.innerHTML=liste.map(function(p){
+    var s=scorer(p), t=typeDeSite(p);
+    var classes='fiche'+(t!=='propre'?' sans-site':'')+(p.statut==='client'?' est-client':'');
+    var liens='';
+    if(p.tel) liens+='<a class="etiquette" href="tel:'+echapper(p.tel.replace(/\s/g,''))+'">'+echapper(p.tel)+'</a>';
+    if(t==='aucun') liens+='<span class="etiquette etiquette-signal">Aucun site</span>';
+    else if(t==='reseau') liens+='<span class="etiquette etiquette-signal">Réseau social seulement</span>';
+    else liens+='<a class="etiquette" href="'+echapper(p.site)+'" target="_blank" rel="noopener noreferrer">'+echapper(hote(p.site))+'</a>';
+    if(p.maps) liens+='<a class="etiquette" href="'+echapper(p.maps)+'" target="_blank" rel="noopener noreferrer">Fiche Maps</a>';
+
+    var options=Object.keys(STATUTS).map(function(k){
+      return '<option value="'+k+'"'+(p.statut===k?' selected':'')+'>'+STATUTS[k]+'</option>';
+    }).join('');
+
+    return '<li class="'+classes+'" data-id="'+echapper(p.id)+'">'
+      +'<div><h3 class="fiche-nom">'+echapper(p.nom)+'</h3>'
+      +'<div class="fiche-meta">'+echapper(p.categorie||'—')
+        +(p.avis?' · '+fmtNote(p.note)+'★ ('+p.avis+' avis)':' · aucun avis')
+        +(p.adresse?' · '+echapper(p.adresse):'')+'</div>'
+      +'<div class="fiche-liens">'+liens+'</div></div>'
+      +'<div class="fiche-droite">'
+        +'<div class="score">'+s.total+'<small>/100</small></div>'
+        +jauge(s)
+        +'<select class="selecteur-statut" aria-label="Statut de '+echapper(p.nom)+'">'+options+'</select>'
+      +'</div>'
+      +((p.statut!=='nouveau'||p.notes)
+        ? '<textarea class="note-fiche" placeholder="Notes d’appel" aria-label="Notes sur '+echapper(p.nom)+'">'+echapper(p.notes)+'</textarea>'
+        : '')
+      +'</li>';
+  }).join('');
+}
+
+/* ================= carte ================= */
+async function rendreCarte(liste){
+  var conteneur=document.getElementById('carte');
+  if(conteneur.hidden) return;
+  var cle=lireCle();
+  if(!cle){ ouvrirCle(); return; }
+  try{
+    await chargerGoogle(cle);
+    var lib=await google.maps.importLibrary('maps');
+    var avecPos=liste.filter(function(p){ return p.lat!=null && p.lng!=null; });
+    if(!carte){
+      carte=new lib.Map(conteneur,{
+        center:avecPos.length?{lat:avecPos[0].lat,lng:avecPos[0].lng}:{lat:46.6,lng:2.5},
+        zoom:avecPos.length?12:5, mapTypeControl:false, streetViewControl:false
+      });
+    }
+    marqueurs.forEach(function(m){ m.setMap(null); });
+    marqueurs=[];
+    if(!avecPos.length) return;
+    var limites=new google.maps.LatLngBounds();
+    avecPos.forEach(function(p){
+      var t=typeDeSite(p);
+      var couleur = p.statut==='client' ? '#0D7C6B' : (t!=='propre' ? '#E2571F' : '#16202B');
+      var m=new google.maps.Marker({
+        position:{lat:p.lat,lng:p.lng}, map:carte, title:p.nom,
+        icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:couleur,fillOpacity:1,
+              strokeColor:'#FFFFFF',strokeWeight:2}
+      });
+      var bulle=new google.maps.InfoWindow({
+        content:'<strong>'+echapper(p.nom)+'</strong><br>'+echapper(p.adresse)
+               +'<br>Signal '+scorer(p).total+'/100'
+      });
+      m.addListener('click',function(){ bulle.open({map:carte,anchor:m}); });
+      marqueurs.push(m);
+      limites.extend({lat:p.lat,lng:p.lng});
+    });
+    carte.fitBounds(limites);
+  }catch(e){
+    journal(e && e.message ? e.message : 'La carte n’a pas pu se charger.',true);
+  }
+}
+
+/* ================= compteurs ================= */
+function rendreStats(){
+  var tous=Object.keys(base).map(function(id){ return base[id]; });
+  var sansSite=tous.filter(function(p){ return typeDeSite(p)!=='propre'; }).length;
+  var appeles=tous.filter(function(p){ return ['appele','rdv','client','perdu'].indexOf(p.statut)>-1; }).length;
+  var clients=tous.filter(function(p){ return p.statut==='client'; }).length;
+  document.getElementById('stat-total').textContent=tous.length;
+  document.getElementById('stat-sans-site').textContent=sansSite;
+  document.getElementById('stat-appeles').textContent=appeles;
+  document.getElementById('stat-clients').textContent=clients;
+  document.getElementById('compteur-base').innerHTML = tous.length
+    ? '<b>'+tous.length+'</b> prospect'+(tous.length>1?'s':'')
+      +' · <b>'+sansSite+'</b> sans site'
+      +' · <b>'+clients+'</b> client'+(clients>1?'s':'')
+    : 'base vide';
+}
+
+function rendre(){
+  var liste=filtrer();
+  rendreAppel(liste);
+  rendreListe(liste);
+  rendreStats();
+  rendreCarte(liste);
+}
+
+/* ================= issues d'appel ================= */
+function marquer(id,issue){
+  var p=base[id]; if(!p) return;
+  if(issue==='passer'){ p.passe=(p.passe||0)+1; }
+  else { p.statut=issue; p.contact=new Date().toISOString().slice(0,10); }
+  ecrire(CLE_BASE,base);
+  rendre();
+}
+
+/* ================= exports ================= */
+function telecharger(nom,contenu,type){
+  var blob=new Blob([contenu],{type:type});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=nom;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+}
+function cellule(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }
+
+function exporterCSV(){
+  var liste=filtrer();
+  if(!liste.length){ journal('Rien à exporter avec ces filtres.',true); return; }
+  var entetes=['Nom','Catégorie','Adresse','Téléphone','Site','Type de site','Note','Avis',
+               'Signal','Statut','Dernier contact','Notes','Fiche Maps'];
+  var lignes=liste.map(function(p){
+    return [p.nom,p.categorie,p.adresse,p.tel,p.site,
+            {aucun:'aucun',reseau:'réseau social',propre:'site propre'}[typeDeSite(p)],
+            p.note?fmtNote(p.note):'',p.avis||0,scorer(p).total,
+            STATUTS[p.statut]||p.statut,p.contact,p.notes,p.maps].map(cellule).join(';');
+  });
+  telecharger('prospects-webxstudio-'+new Date().toISOString().slice(0,10)+'.csv',
+    '﻿'+[entetes.map(cellule).join(';')].concat(lignes).join('\r\n'),
+    'text/csv;charset=utf-8');
+  journal(liste.length+' fiche'+(liste.length>1?'s':'')+' exportée'+(liste.length>1?'s':'')+' en CSV.');
+}
+
+function ouvrirSauvegarde(){
+  var voile=document.createElement('div');
+  voile.className='voile';
+  voile.innerHTML='<div class="panneau" role="dialog" aria-modal="true" aria-label="Sauvegarde de la base">'
+    +'<h2>Sauvegarde</h2>'
+    +'<p>La base vit dans ce navigateur. Exporte-la pour la garder ou la reprendre sur une autre machine.</p>'
+    +'<div class="champ"><button class="bouton" data-act="export">Exporter la base (JSON)</button></div>'
+    +'<div class="champ"><button class="bouton" data-act="import">Importer une sauvegarde</button></div>'
+    +'<div class="champ"><button class="bouton-fin" data-act="vider">Vider la base</button></div>'
+    +'<button class="bouton-fin" data-act="fermer">Fermer</button></div>';
+  document.body.appendChild(voile);
+  voile.addEventListener('click',function(e){
+    var act=e.target.getAttribute && e.target.getAttribute('data-act');
+    if(e.target===voile || act==='fermer'){ voile.remove(); return; }
+    if(act==='export'){
+      telecharger('base-webxstudio-'+new Date().toISOString().slice(0,10)+'.json',
+                  JSON.stringify(base,null,2),'application/json');
+      voile.remove();
+    }
+    if(act==='import'){ document.getElementById('import-fichier').click(); voile.remove(); }
+    if(act==='vider'){
+      if(confirm('Vider la base ? Les '+Object.keys(base).length+' prospects et leurs notes seront perdus.')){
+        base={}; ecrire(CLE_BASE,base); rendre(); journal('Base vidée.');
+      }
+      voile.remove();
+    }
+  });
+}
+
+function importer(fichier){
+  var lecteur=new FileReader();
+  lecteur.onload=function(){
+    try{
+      var donnees=JSON.parse(lecteur.result), ajoutes=0;
+      Object.keys(donnees).forEach(function(id){
+        if(!base[id]){ base[id]=donnees[id]; ajoutes++; }
+      });
+      ecrire(CLE_BASE,base); rendre();
+      journal(ajoutes+' prospect'+(ajoutes>1?'s':'')+' importé'+(ajoutes>1?'s':'')+'.');
+    }catch(e){ journal('Fichier illisible : ce n’est pas une sauvegarde valide.',true); }
+  };
+  lecteur.readAsText(fichier);
+}
+
+/* ================= panneau clé ================= */
+function ouvrirCle(){
+  document.getElementById('voile-cle').hidden=false;
+  document.getElementById('saisie-cle').focus();
+}
+function fermerCle(){ document.getElementById('voile-cle').hidden=true; }
+
+/* ================= diagnostic ================= */
+/* Chaque étape est testée séparément : la première ligne en échec dit
+   exactement quoi corriger côté Google Cloud. */
+async function diagnostiquer(){
+  var commune=document.getElementById('saisie-commune').value.trim()||'Toulon';
+  var lignes=[], voile=document.createElement('div');
+  voile.className='voile';
+  voile.innerHTML='<div class="panneau" role="dialog" aria-modal="true" aria-label="Diagnostic">'
+    +'<h2>Diagnostic</h2><pre id="diag-sortie" style="font-family:var(--donnee);font-size:12.5px;'
+    +'white-space:pre-wrap;line-height:1.7;margin:0 0 16px"></pre>'
+    +'<button class="bouton-fin" data-fermer="1">Fermer</button></div>';
+  document.body.appendChild(voile);
+  voile.addEventListener('click',function(e){
+    if(e.target===voile||e.target.getAttribute('data-fermer')) voile.remove();
+  });
+  var sortie=voile.querySelector('#diag-sortie');
+  function dire(t){ lignes.push(t); sortie.textContent=lignes.join('\n'); }
+
+  dire('\u2022 Adresse de la page : '+location.origin+'  \u2192 référent à autoriser : '+location.origin+'/*');
+  var cle=lireCle();
+  dire((cle?'\u2713':'\u2717')+' Clé enregistrée'+(cle?' ('+cle.length+' caractères, commence par '+cle.slice(0,4)+'\u2026)':' : aucune'));
+  if(!cle){ dire('\u2192 Bouton « Clé API » pour la saisir.'); return; }
+
+  dire('\u2026 Chargement du script Google Maps');
+  try{ await chargerGoogle(cle); dire('\u2713 Script chargé'); }
+  catch(e){ dire('\u2717 '+e.message); return; }
+
+  dire((window.google&&google.maps&&google.maps.Geocoder?'\u2713':'\u2717')+' Geocoding API disponible');
+  dire((window.google&&google.maps&&google.maps.places&&google.maps.places.Place?'\u2713':'\u2717')+' Places API (New) disponible');
+
+  dire('\u2026 Géocodage de « '+commune+' »');
+  var centre;
+  try{
+    var r=await (await geocodeur()).geocode({address:commune,region:'fr'});
+    if(!r.results.length){ dire('\u2717 Commune introuvable'); return; }
+    centre=r.results[0].geometry.location;
+    dire('\u2713 '+commune+' situé ('+centre.lat().toFixed(3)+', '+centre.lng().toFixed(3)+')');
+  }catch(e){ dire('\u2717 Geocoding : '+(e.name?e.name+' \u2014 ':'')+e.message);
+             dire('\u2192 Active Geocoding API sur le projet Google Cloud.'); return; }
+
+  dire('\u2026 Recherche Places d\u2019essai (« boulangerie »)');
+  try{
+    var res=await (await lieux()).Place.searchByText({
+      textQuery:'boulangerie '+commune, fields:['id','displayName'],
+      locationBias:{center:centre,radius:5000}, maxResultCount:5, language:'fr', region:'fr'});
+    var n=(res.places||[]).length;
+    dire((n?'\u2713':'\u2717')+' '+n+' résultat'+(n>1?'s':'')+(n?' \u2014 tout fonctionne, le balayage doit marcher.':' \u2014 la requête passe mais ne renvoie rien.'));
+  }catch(e){
+    dire('\u2717 Places : '+(e.name?e.name+' \u2014 ':'')+e.message);
+    dire('\u2192 Active « Places API (New) », pas l\u2019ancienne « Places API ».');
+  }
+}
+
+/* ================= démarrage ================= */
+var METIERS=['coiffeur','restaurant','garage','plombier','boulangerie','institut de beauté',
+             'électricien','fleuriste','menuisier','ostéopathe','pizzeria','maçon'];
+
+function init(){
+  base=lire(CLE_BASE,{});
+
+  document.getElementById('metiers-rapides').innerHTML=METIERS.map(function(m){
+    return '<button class="puce" type="button" data-metier="'+m+'">'+m+'</button>';
+  }).join('');
+  document.getElementById('metiers-rapides').addEventListener('click',function(e){
+    var m=e.target.getAttribute('data-metier');
+    if(m){ document.getElementById('saisie-metier').value=m; }
+  });
+
+  document.getElementById('saisie-rayon').addEventListener('input',function(){
+    document.getElementById('valeur-rayon').textContent=this.value;
+  });
+  document.getElementById('btn-balayer').addEventListener('click',balayer);
+  document.getElementById('saisie-commune').addEventListener('keydown',function(e){
+    if(e.key==='Enter') balayer();
+  });
+
+  ['filtre-texte','filtre-sans-site','filtre-statut','filtre-tri'].forEach(function(id){
+    document.getElementById(id).addEventListener('input',rendre);
+    document.getElementById(id).addEventListener('change',rendre);
+  });
+
+  document.getElementById('zone-appel').addEventListener('click',function(e){
+    var bouton=e.target.closest('.issue'); if(!bouton) return;
+    marquer(bouton.parentNode.getAttribute('data-id'),bouton.getAttribute('data-issue'));
+  });
+
+  var ul=document.getElementById('liste-prospects');
+  ul.addEventListener('change',function(e){
+    if(!e.target.classList.contains('selecteur-statut')) return;
+    var p=base[e.target.closest('.fiche').getAttribute('data-id')];
+    if(!p) return;
+    p.statut=e.target.value;
+    if(p.statut!=='nouveau') p.contact=new Date().toISOString().slice(0,10);
+    ecrire(CLE_BASE,base); rendre();
+  });
+  ul.addEventListener('input',function(e){
+    if(!e.target.classList.contains('note-fiche')) return;
+    var p=base[e.target.closest('.fiche').getAttribute('data-id')];
+    if(!p) return;
+    p.notes=e.target.value;
+    ecrire(CLE_BASE,base);
+    rendreStats();
+  });
+
+  var ongletListe=document.getElementById('onglet-liste'), ongletCarte=document.getElementById('onglet-carte');
+  function basculer(versCarte){
+    ongletListe.setAttribute('aria-selected',String(!versCarte));
+    ongletCarte.setAttribute('aria-selected',String(versCarte));
+    document.getElementById('liste-prospects').hidden=versCarte;
+    document.getElementById('carte').hidden=!versCarte;
+    if(versCarte) rendreCarte(filtrer());
+  }
+  ongletListe.addEventListener('click',function(){ basculer(false); });
+  ongletCarte.addEventListener('click',function(){ basculer(true); });
+
+  document.getElementById('btn-exporter-csv').addEventListener('click',exporterCSV);
+  document.getElementById('btn-sauvegarde').addEventListener('click',ouvrirSauvegarde);
+  document.getElementById('btn-cle').addEventListener('click',ouvrirCle);
+  document.getElementById('btn-diag').addEventListener('click',diagnostiquer);
+  document.getElementById('btn-fermer-cle').addEventListener('click',fermerCle);
+  document.getElementById('import-fichier').addEventListener('change',function(){
+    if(this.files && this.files[0]) importer(this.files[0]);
+    this.value='';
+  });
+
+  document.getElementById('btn-enregistrer-cle').addEventListener('click',function(){
+    var cle=document.getElementById('saisie-cle').value.trim();
+    if(!cle){ return; }
+    try{ localStorage.setItem(CLE_API,cle); }catch(e){}
+    fermerCle();
+    effacerJournal();
+    if(googlePret) location.reload();   /* l'API ne se recharge pas à chaud */
+    else chargerGoogle(cle).then(function(){ journal('Clé enregistrée. Lance un balayage.'); })
+                           .catch(function(e){ journal(e.message,true); });
+  });
+
+  /* raccourcis de la file d'appels */
+  document.addEventListener('keydown',function(e){
+    if(e.ctrlKey||e.metaKey||e.altKey) return;
+    var cible=e.target.tagName;
+    if(cible==='INPUT'||cible==='TEXTAREA'||cible==='SELECT') return;
+    var actions={a:'appele',r:'rdv',c:'client',p:'perdu',s:'passer'};
+    var issue=actions[e.key.toLowerCase()];
+    if(!issue) return;
+    var zone=document.querySelector('.appel-actions');
+    if(!zone) return;
+    e.preventDefault();
+    marquer(zone.getAttribute('data-id'),issue);
+  });
+
+  rendre();
+  if(!lireCle()) ouvrirCle();
+}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else init();
+
+})();
+</script>
+</body>
+</html>
