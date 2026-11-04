@@ -16,8 +16,8 @@ d'un jeu, voler un compte, exploiter une vulnérabilité, ni obtenir un avantage
 | Perception uniquement par capture d'écran sanctionnée par l'OS | Seul backend : `mss` (API de capture de l'OS). Aucun accès mémoire, injection ni hook de processus dans le code | Une règle de conception, pas un contrôle technique : rien n'empêche un développeur d'ajouter un backend illicite — d'où la revue de code et le futur registre de plugins |
 | Capture avec permission explicite | ✅ `CaptureConsent` obligatoire : un affichage précis (« tous les écrans » refusé), zone optionnelle, durée bornée, cadence max, auteur et finalité journalisés. Vérifié à l'ouverture **et à chaque lecture** | Le consentement est une porte de contrôle + piste d'audit, **pas une barrière contre du code malveillant déjà dans le processus**. Il doit être émis par l'application après confirmation humaine |
 | Arrêt d'urgence | ✅ `KillSwitch` partagé, vérifié avant chaque capture ; reste actif jusqu'à `reset()` explicite | Interrompt la prochaine opération, pas une opération déjà en cours dans un détecteur |
-| Mode supervisé / autonome, limites d'exécution, permissions d'actions | 📐 Action Engine et Plugin SDK (voir §5) | Rien n'agit encore sur un jeu : **le module ne contrôle ni souris ni clavier** |
-| Pas de jeux compétitifs en ligne par défaut | 📐 le manifeste de plugin déclarera `multiplayer` / `competitive` ; l'autonomie sera refusée sans autorisation documentée | Un logiciel ne peut pas juger les CGU d'un jeu : la responsabilité d'usage reste à l'utilisateur. De nombreux jeux interdisent *toute* automatisation, même par capture d'écran |
+| Mode supervisé / autonome, limites d'exécution, permissions d'actions | 🟡 le **SDK de plugins** déclare et valide modes, limites et permissions (`resolve_autonomy` refuse sans dégrader en silence) ; l'**Action Engine** qui les appliquerait n'existe pas (📐) | Rien n'agit encore sur un jeu : **le module ne contrôle ni souris ni clavier** |
+| Pas de jeux compétitifs ni multijoueurs en ligne sans autorisation | ✅ politique des plugins (P001–P014) : multijoueur/anti-cheat/compétitif exigent une permission de l'éditeur **avec preuve**, et interdisent l'autonomie ; vocabulaire fermé, aucune notion de contournement exprimable. Détail : [05-PLUGIN-SDK.md](05-PLUGIN-SDK.md) | L'autorisation est **déclarative** : un logiciel ne peut pas vérifier les CGU d'un jeu. De nombreux jeux interdisent *toute* automatisation, même par capture d'écran |
 
 ## 2. Architecture : moteurs remplaçables
 
@@ -28,15 +28,15 @@ Remplacer un moteur = fournir un autre objet respectant le protocole.
                       core  (contrats : Frame, Detection, Rect, FrameSource, Detector, KillSwitch)
                        ▲
      ┌─────────────────┼───────────────────┬─────────────────┐
-  consent          capture             vision           perception
-  (CaptureConsent) (écran, rejeu)  (couleur, gabarit,   (pipeline, ROI,
-                                      ONNX/YOLO)         changement)
+  consent          capture             vision           perception        plugin
+  (CaptureConsent) (écran, rejeu)  (couleur, gabarit,   (pipeline, ROI,   (manifeste, politique,
+                                      ONNX/YOLO)         changement)       intégrité : DONNÉES)
 ```
 
 **Frontières vérifiées automatiquement** (`tests/test_replay_architecture_cli.py`, analyse AST du code) :
-`vision` et `perception` n'importent que `core` ; `capture` n'importe que `core` et `consent` ; `core` et
+`vision`, `perception` et `plugin` n'importent que `core` ; `capture` n'importe que `core` et `consent` ; `core` et
 `perception` n'importent ni OpenCV, ni mss, ni ONNX Runtime (importer `core`/`perception` ne charge aucune
-bibliothèque lourde — testé dans un sous-processus). Seuls `probe.py` et `cli.py` (racine de composition)
+bibliothèque lourde — testé dans un sous-processus). Seuls `probe.py`, `cli.py` et `assemble.py` (racine de composition)
 assemblent plusieurs moteurs. Ajouter un moteur sans déclarer ses frontières fait échouer le test.
 
 Conventions : image **BGR uint8** (ordre natif OpenCV) ; coordonnées de régions en points logiques,
@@ -59,7 +59,7 @@ non calibré) — **ce ne sont pas des probabilités**.
 | 8 | Strategy Planner | 📐 | Les LLM n'interviennent que pour planifier, jamais par image |
 | 9 | Behavior Engine | 📐 | |
 | 10 | Action Engine | 📐 | Chaque action passera par un moteur de permissions ; **aucune action n'est implémentée** |
-| 11 | Game Plugin System | 📐 | SDK conçu en §5 |
+| 11 | Game Plugin System | ✅ prototype | SDK de plugins **en données** : manifeste strict, vocabulaire fermé, politique de conformité, scellé SHA-256, CLI `plugin validate`, assemblage du pipeline. Voir [05-PLUGIN-SDK.md](05-PLUGIN-SDK.md). **Aucune action exécutable** (pas d'Action Engine) |
 | 12 | Training Lab | 🟡 amorce | Enregistrement/rejeu + `match_boxes` (précision, rappel, IoU) — pour l'instant utilisés par les tests |
 | 13 | Game Runtime | 📐 | |
 | 14 | Live Monitoring | 📐 | La latence par étape et les erreurs de détecteur sont déjà exposées dans `Perception` |
@@ -87,16 +87,16 @@ with ScreenCaptureSource(consent, kill_switch=kill) as source:
 Exemple exécutable : [`examples/live_detect.py`](../packages/gaming/examples/live_detect.py).
 Outils : `make gaming-probe` (capacités réelles), `make gaming-selfcheck ARGS="--i-consent --out c.png"`.
 
-## 5. Conception (non construite) : Plugin SDK et modes d'autonomie
+## 5. Plugin SDK (construit) et modes d'autonomie (conception)
 
-**Manifeste de plugin** (validé par Pydantic, refusé s'il est incomplet ou incohérent) : identité du jeu,
-plateforme, version, capacités, APIs, méthodes de capture, actions permises, permissions requises, limites
-(durée, cadence, actions/minute), `multiplayer`, `competitive`, et la **source d'autorisation** (jeu de
-l'utilisateur, CGU autorisant l'automatisation, serveur privé…). Une liste blanche de capacités ; toute capacité
-de type accès mémoire / injection / contournement est **rejetée à la validation**, pas seulement déconseillée.
+**Plugin SDK — construit** : voir [05-PLUGIN-SDK.md](05-PLUGIN-SDK.md). Un manifeste déclare identité, plateformes, version,
+capacités, APIs, méthodes de capture, actions, permissions, limites, source d'autorisation et profil de vision ; une liste
+blanche fermée rend inexprimable toute capacité d'accès mémoire / injection / contournement.
 
-**Mode supervisé** : observer → analyser → *proposer* → l'utilisateur valide → le moteur de permissions
-vérifie → exécution. **Mode autonome** : observer → analyser → décider → permissions → exécution →
+**Modes d'autonomie — conception** (le Brain et l'Action Engine n'existent pas) :
+
+- **Mode supervisé** : observer → analyser → *proposer* → l'utilisateur valide → le moteur de permissions
+vérifie → exécution. - **Mode autonome** : observer → analyser → décider → permissions → exécution →
 **vérification du résultat**. Configurable par projet ; l'arrêt d'urgence et les limites d'exécution
 s'appliquent aux deux.
 
@@ -149,10 +149,9 @@ manquante), `make test-gaming` (le test d'écran réel s'ignore automatiquement 
 
 ## 9. Ordre de développement (suite)
 
-Plan demandé : 1 audit ✅ · 2 architecture ✅ · 3 Plugin SDK · 4 agent local macOS · 5 capture (✅ prototype) ·
+Plan demandé : 1 audit ✅ · 2 architecture ✅ · 3 Plugin SDK ✅ (prototype) · 4 agent local macOS · 5 capture (✅ prototype) ·
 6 vision (✅ prototype) · 7 OCR et suivi · 8 état du jeu · 9 cerveau · 10 comportements · 11 actions ·
 12 Training Lab · 13 monitoring · 14 Windows/NVIDIA.
 
 Prochaine étape recommandée : **valider la capture sur votre Mac** (§7), puis **OCR + suivi** (étape 7), qui
-complètent la perception avant l'état du jeu. Le Plugin SDK (étape 3) est la meilleure occasion d'encoder les règles
-de conformité du §1 dans du code ; je propose de le faire juste après la validation Mac.
+complètent la perception avant l'état du jeu.

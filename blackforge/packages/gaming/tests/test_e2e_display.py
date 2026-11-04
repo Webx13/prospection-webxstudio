@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from blackforge_gaming.assemble import build_pipeline
 from blackforge_gaming.capture import (
     ReplaySource,
     ScreenCaptureSource,
@@ -36,6 +37,7 @@ from blackforge_gaming.cli import main
 from blackforge_gaming.consent import CaptureConsent
 from blackforge_gaming.core import Availability, EmergencyStop, Frame, KillSwitch, Rect
 from blackforge_gaming.perception import ChangeDetector, DetectorBinding, PerceptionPipeline
+from blackforge_gaming.plugin import load_plugin
 from blackforge_gaming.vision import ColorBlobDetector, TemplateDetector
 from tests.metrics import match_boxes
 from tests.scenes import BACKGROUND, RED, sprite
@@ -44,6 +46,7 @@ pytestmark = pytest.mark.display
 
 X11_SOCKETS = Path("/tmp/.X11-unix")  # noqa: S108 — répertoire standard des sockets X11
 GAME = Path(__file__).parent / "fixtures" / "testgame" / "index.html"
+PLUGIN_DIR = Path(__file__).parents[1] / "plugins" / "blackforge-test-game"
 SCREEN = (1280, 720)
 
 # ----------------------------------------------------------------------- vérité terrain
@@ -433,3 +436,22 @@ def test_cli_selfcheck_on_the_real_display(
     stdout = capsys.readouterr().out
     assert "1280x720" in stdout and out.stat().st_size > 1000
     assert "uniforme" not in stdout
+
+
+def test_plugin_driven_pipeline_matches_ground_truth_on_real_capture(static_game: None) -> None:
+    """Le pipeline est construit UNIQUEMENT à partir du plugin (donnée validée et scellée), et la
+    cadence de capture est plafonnée par les limites déclarées du plugin."""
+    plugin = load_plugin(PLUGIN_DIR)
+    pipeline = build_pipeline(plugin)
+    consent = _consent(max_fps=plugin.manifest.limits.max_fps)
+    assert consent.max_fps == 30.0
+    with ScreenCaptureSource(consent) as source:
+        frame = source.read()
+    assert frame is not None
+    perception = pipeline.process(frame)
+    assert perception.analyzed and not perception.degraded
+    expected = {"enemy": RED_TRUTH, "ally": GREEN_TRUTH, "hero": SPRITE_TRUTH}
+    for label, truth in expected.items():
+        result = match_boxes(truth, _boxes(perception.detections, label))
+        assert (result.precision, result.recall) == (1.0, 1.0), f"{label}: {result}"
+        assert result.mean_iou >= 0.95

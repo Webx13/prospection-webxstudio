@@ -154,6 +154,7 @@ ALLOWED_INTERNAL = {
     "capture": {"core", "consent"},
     "vision": {"core"},
     "perception": {"core"},
+    "plugin": {"core"},
 }
 # Dépendances tierces autorisées par moteur (le cœur et la perception restent légers).
 FORBIDDEN_THIRD_PARTY = {
@@ -162,9 +163,10 @@ FORBIDDEN_THIRD_PARTY = {
     "consent": {"cv2", "mss", "onnxruntime", "onnx"},
     "vision": {"mss"},
     "capture": {"onnxruntime", "onnx"},
+    "plugin": {"cv2", "mss", "onnxruntime", "onnx"},
 }
 # Racine de composition : seule à pouvoir tout assembler.
-COMPOSITION_ROOT = {"probe.py", "cli.py", "__init__.py"}
+COMPOSITION_ROOT = {"probe.py", "cli.py", "assemble.py", "__init__.py"}
 
 
 def imports_of(path: Path) -> Iterator[str]:

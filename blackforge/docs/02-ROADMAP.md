@@ -59,7 +59,7 @@ Détail, interfaces, mesures et limites : [04-GAMING-ARCHITECTURE.md](04-GAMING-
 |---|---|---|
 | 1 | Audit | ✅ (capacités de la machine, licences : AGPL d'Ultralytics, versions macOS minimales) |
 | 2 | Architecture gaming | ✅ moteurs indépendants, frontières vérifiées par test |
-| 3 | Game Plugin SDK | 📐 conçu, non construit |
+| 3 | Game Plugin SDK | ✅ prototype (manifestes en données, politique de conformité, scellé SHA-256) — **actions déclarées inertes : pas d'Action Engine** |
 | 4 | Agent local macOS | 📐 (Phase 8 de la feuille de route générale) |
 | 5 | Screen Capture Engine | ✅ prototype — **vérifié sur Linux/Xvfb ; jamais exécuté sur Mac** |
 | 6 | Vision Engine | ✅ prototype (couleur, gabarit, adaptateur ONNX/YOLO) — **aucun modèle réel évalué** |
@@ -67,14 +67,15 @@ Détail, interfaces, mesures et limites : [04-GAMING-ARCHITECTURE.md](04-GAMING-
 | 8–13 | État du jeu, cerveau, comportements, actions, Training Lab, monitoring | 📐 (Training Lab : amorce enregistrement/rejeu + métriques) |
 | 14 | Windows / NVIDIA | 📐 sélection du backend d'accélération codée, jamais exécutée sur GPU |
 
-**Livré et vérifié** (Linux x86-64) : 97 tests unitaires + 8 tests de bout en bout sur une **vraie capture** (Xvfb +
-Chromium jouant un jeu de test, vérité terrain exacte) ; ruff et mypy `--strict` propres ; frontières d'architecture
-vérifiées ; 5 garanties de sécurité/exactitude éprouvées par mutation (consentement revérifié, arrêt d'urgence, cadence
-maximale, résolution changée, décalage du letterbox).
+**Livré et vérifié** (Linux x86-64) : **175 tests** dont 9 de bout en bout sur une **vraie capture** (Xvfb + Chromium
+jouant un jeu de test, vérité terrain exacte) ; ruff et mypy `--strict` propres ; frontières d'architecture vérifiées ;
+13 garanties de sécurité/exactitude éprouvées par mutation (consentement revérifié, arrêt d'urgence, cadence maximale,
+résolution changée, décalage du letterbox, et 8 protections du SDK : règles anti-cheat et multijoueur, confinement des
+chemins, empreintes, refus d'autonomie, champs inconnus, vocabulaire). Détail : [05-PLUGIN-SDK.md](05-PLUGIN-SDK.md).
 
 **Réserves** : aucun contrôle de jeu (ni souris, ni clavier, ni manette) n'existe ; la détection n'a été mesurée que sur une
 scène synthétique propre ; ≈ 100 ms par analyse complète 1280×720 sur ce CPU (trop lent pour du temps réel image par image,
 d'où l'analyse événementielle) ; pas d'intégration à l'API, à l'interface web ni au WebSocket de monitoring.
 
 **Prochaine étape** : vous exécutez `make gaming-probe` et `make gaming-selfcheck` sur votre Mac (5 minutes, voir le §7 du
-document d'architecture), puis Plugin SDK (conformité encodée dans du code), puis OCR et suivi.
+document d'architecture), puis OCR et suivi (étape 7).

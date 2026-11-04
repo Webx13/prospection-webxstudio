@@ -15,6 +15,7 @@ import numpy as np
 from blackforge_gaming.capture import CaptureUnavailableError, ScreenCaptureSource
 from blackforge_gaming.consent import CaptureConsent, ConsentError
 from blackforge_gaming.core.geometry import Rect
+from blackforge_gaming.plugin import PluginRejectedError, load_plugin
 from blackforge_gaming.probe import build_report
 
 
@@ -84,6 +85,52 @@ def _selfcheck(args: argparse.Namespace) -> int:
     return verdict
 
 
+def _plugin_validate(args: argparse.Namespace) -> int:
+    try:
+        loaded = load_plugin(Path(args.directory))
+    except PluginRejectedError as exc:
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "accepted": False,
+                        "plugin": exc.plugin,
+                        "errors": [{"code": v.code, "message": v.message} for v in exc.violations],
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"REFUSÉ : {exc.plugin}", file=sys.stderr)
+            for v in exc.violations:
+                print(f"  [{v.code}] {v.message}", file=sys.stderr)
+        return 1
+    manifest = loaded.manifest
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "accepted": True,
+                    "plugin": manifest.id,
+                    "version": manifest.version,
+                    "warnings": [
+                        {"code": w.code, "message": w.message} for w in loaded.report.warnings
+                    ],
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return 0
+    print(
+        f"ACCEPTÉ : {manifest.id} {manifest.version} — {manifest.game.title} ({manifest.game.mode.value})"
+    )
+    for warning in loaded.report.warnings:
+        print(f"  avertissement [{warning.code}] {warning.message}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blackforge-gaming")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -100,6 +147,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--i-consent", action="store_true", help="confirme la capture de votre écran"
     )
     check.set_defaults(func=_selfcheck)
+
+    plugin = sub.add_parser("plugin", help="outils du SDK de plugins")
+    plugin_sub = plugin.add_subparsers(dest="plugin_command", required=True)
+    validate = plugin_sub.add_parser(
+        "validate", help="valide un plugin (structure, conformité, intégrité)"
+    )
+    validate.add_argument("directory", help="dossier contenant plugin.json")
+    validate.add_argument("--json", action="store_true", help="sortie JSON")
+    validate.set_defaults(func=_plugin_validate)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

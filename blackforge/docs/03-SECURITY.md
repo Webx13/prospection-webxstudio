@@ -41,7 +41,10 @@ Légende : ✅ en place et testé · 🟡 partiel · 📐 conçu, pas construit.
 | Cadence plafonnée | ✅ | la lecture se bloque pour respecter `max_fps` ; l'attente ne peut pas survivre à l'expiration du consentement |
 | Arrêt d'urgence | ✅ | `KillSwitch` vérifié avant chaque capture (mutation vérifiée) ; actif jusqu'à `reset()` explicite |
 | Piste d'audit de capture | 🟡 | journaux `capture_opened` / `capture_closed` (auteur, finalité, zone, nombre d'images), **jamais de pixels** (testé). Journal local, pas encore centralisé |
-| Aucun contournement d'anti-cheat, accès mémoire, injection, ni dissimulation | 🟡 | tenu **par conception** (seule capture d'écran de l'OS) ; l'interdiction sera encodée dans la validation du manifeste de plugin (📐). Aucun contrôle technique ne peut garantir qu'un tiers n'ajoute pas un backend illicite |
+| Aucun contournement d'anti-cheat, accès mémoire, injection, ni dissimulation | 🟡 | tenu **par conception** (seule capture d'écran de l'OS) **et** par le SDK de plugins : vocabulaire fermé (ces notions ne s'expriment pas), champs inconnus refusés, politique P001–P014 (testée, mutations vérifiées). Aucun contrôle technique ne peut empêcher un développeur du cœur d'ajouter un backend illicite : revue de code requise |
+| Plugins : pas d'exécution de code tiers, intégrité des fichiers | ✅ | un plugin est de la donnée (`evil.py` jamais importé : testé) ; fichiers confinés au dossier (`..`, chemin absolu, lien symbolique sortant refusés) ; SHA-256 vérifié ; tailles bornées |
+| Plugins : authenticité de l'éditeur | 📐 | **non construit** : le scellé détecte l'altération, pas un éditeur malveillant. Il faudra signatures + registre revu |
+| Plugins : autorisation d'automatiser un jeu | 🟡 | **déclarative** (preuve exigée mais non vérifiable par BLACKFORGE) ; multijoueur / anti-cheat / compétitif interdisent l'autonomie |
 | Traitement local, pas d'envoi systématique d'images vers le cloud | ✅ | aucune dépendance réseau dans le paquet ; rien n'est écrit ni émis sans appel explicite (`record_frames`) |
 | Contrôle de souris / clavier / manette, mode supervisé, permissions d'actions | 📐 | **non construit** : le module ne peut rien faire dans un jeu |
 | Modèles ONNX non fiables | 📐 | un `.onnx` est un graphe exécuté par ONNX Runtime : provenance à maîtriser ; aucune vérification de signature |

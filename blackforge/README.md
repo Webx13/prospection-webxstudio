@@ -41,16 +41,16 @@ Capture d'écran soumise à consentement + détection visuelle, indépendants de
 ```bash
 make gaming-probe                                            # capacités réelles de votre machine
 make gaming-selfcheck ARGS="--i-consent --out ~/check.png"   # capture UNE image de votre écran
-make test-gaming                                             # 105 tests (écran réel : Linux + Xvfb + Chromium)
+make test-gaming                                             # 175 tests (écran réel : Linux + Xvfb + Chromium)
 ```
 
 Jamais exécuté sur Mac à ce jour : lancez ces trois commandes et signalez le résultat. Détails, mesures et limites :
-[docs/04-GAMING-ARCHITECTURE.md](docs/04-GAMING-ARCHITECTURE.md).
+[docs/04-GAMING-ARCHITECTURE.md](docs/04-GAMING-ARCHITECTURE.md) et [docs/05-PLUGIN-SDK.md](docs/05-PLUGIN-SDK.md).
 
 ## Vérifier que tout fonctionne
 
 ```bash
-make test      # API (43 tests, dont intégration sur PostgreSQL réel) + web (25) + gaming (105)
+make test      # API (43 tests, dont intégration sur PostgreSQL réel) + web (25) + gaming (175)
 make lint      # ruff, mypy strict, eslint, tsc
 ```
 
@@ -72,7 +72,7 @@ blackforge/
 │   ├── api/    FastAPI · Pydantic v2 · SQLAlchemy 2 async · Alembic · PostgreSQL
 │   └── web/    Next.js 16 · React 19 · Tailwind 4 · TypeScript strict
 ├── packages/
-│   └── gaming/ Gaming AI : capture d'écran (consentement), vision, perception (prototype)
+│   └── gaming/ Gaming AI : capture (consentement), vision, perception, SDK de plugins (prototype)
 ├── docs/       audit, architecture, feuille de route, sécurité, architecture gaming
 ├── docker-compose.yml
 ├── Makefile

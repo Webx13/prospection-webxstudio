@@ -1,0 +1,95 @@
+{
+  "manifest_version": 1,
+  "id": "dev.blackforge.test-game",
+  "name": "BLACKFORGE — jeu de test",
+  "version": "1.0.0",
+  "publisher": "BLACKFORGE",
+  "description": "Plugin d'exemple : le jeu de test écrit pour BLACKFORGE (tests/fixtures/testgame). Observation seule, aucune action.",
+  "game": {
+    "title": "Jeu de test BLACKFORGE",
+    "publisher": "BLACKFORGE",
+    "platforms": [
+      "linux",
+      "macos",
+      "windows"
+    ],
+    "mode": "test_environment",
+    "competitive": false,
+    "anti_cheat": "none"
+  },
+  "authorization": {
+    "kind": "test_environment",
+    "evidence": "Jeu écrit par BLACKFORGE pour tester ses moteurs (tests/fixtures/testgame/index.html)"
+  },
+  "capabilities": [
+    "detect_objects",
+    "recognize_interface"
+  ],
+  "apis": [],
+  "capture_methods": [
+    "display",
+    "screen_region",
+    "replay_file"
+  ],
+  "actions": [],
+  "permissions": [
+    "capture.screen",
+    "storage.recordings"
+  ],
+  "limits": {
+    "max_session_seconds": 600,
+    "max_fps": 30,
+    "max_actions_per_minute": 0,
+    "autonomous_allowed": false,
+    "default_autonomy": "supervised"
+  },
+  "vision": {
+    "regions": [],
+    "detectors": [
+      {
+        "kind": "color",
+        "name": "red",
+        "label": "enemy",
+        "hsv_lower": [
+          170,
+          120,
+          120
+        ],
+        "hsv_upper": [
+          10,
+          255,
+          255
+        ],
+        "min_area": 400
+      },
+      {
+        "kind": "color",
+        "name": "green",
+        "label": "ally",
+        "hsv_lower": [
+          45,
+          120,
+          120
+        ],
+        "hsv_upper": [
+          75,
+          255,
+          255
+        ],
+        "min_area": 400
+      },
+      {
+        "kind": "template",
+        "name": "hero",
+        "label": "hero",
+        "template": "templates/hero.png",
+        "threshold": 0.95
+      }
+    ],
+    "change_threshold": 0.002,
+    "max_stale_frames": 30
+  },
+  "files": {
+    "templates/hero.png": "7496e9a00fcae5d4f2ef7139c92ff242009f10e218da7fd8ca8b2aa9de23408e"
+  }
+}
