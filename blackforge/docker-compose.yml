@@ -1,0 +1,65 @@
+# Développement local. Par défaut seul PostgreSQL démarre (make db-up) ; l'API et le web
+# tournent en natif pour un rechargement rapide. make up lance toute la pile en conteneurs.
+name: blackforge
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?copiez .env.example vers .env (make setup)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copiez .env.example vers .env (make setup)}
+      POSTGRES_DB: ${POSTGRES_DB:-blackforge}
+    ports:
+      # Lié à la boucle locale uniquement : la base n'est jamais exposée au réseau.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    profiles: ["full"]
+    build: ./apps/api
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      BLACKFORGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-blackforge}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    profiles: ["full"]
+    build: ./apps/api
+    restart: unless-stopped
+    environment:
+      BLACKFORGE_APP_ENV: development
+      BLACKFORGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-blackforge}
+      BLACKFORGE_CORS_ORIGINS: http://localhost:3000
+      BLACKFORGE_LOG_JSON: "true"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ./apps/web
+      args:
+        API_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

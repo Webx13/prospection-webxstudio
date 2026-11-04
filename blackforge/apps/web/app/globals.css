@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Identité BLACKFORGE : noir profond, anthracite, gris métallisés, blanc. Accents réservés à l'état. */
+@theme {
+  --color-ink-950: #07070a;
+  --color-ink-900: #0c0c10;
+  --color-ink-800: #121217;
+  --color-ink-700: #1a1a21;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+  --color-steel-100: #eceef2;
+  --color-steel-300: #b4b9c3;
+  --color-steel-400: #8c92a0;
+  --color-ok: #8fd3b0;
+  --color-warn: #d9a441;
+  --color-fault: #e0553a;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-ink-950);
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-steel-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(255 255 255 / 0.85);
+  color: var(--color-ink-950);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-steel-100);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
