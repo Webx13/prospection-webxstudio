@@ -33,6 +33,24 @@ Légende : ✅ en place et testé · 🟡 partiel · 📐 conçu, pas construit.
 **Règle ferme** : tant que la Phase 9 n'est pas terminée **et** qu'un niveau d'isolation de production
 (gVisor / micro-VM) n'est pas en place, aucune exécution de code d'utilisateur tiers ne sera exposée.
 
+## Gaming AI (voir [04-GAMING-ARCHITECTURE.md](04-GAMING-ARCHITECTURE.md))
+
+| Exigence | État | Détail / test |
+|---|---|---|
+| Capture uniquement avec permission explicite | ✅ | `CaptureConsent` : affichage précis (« tous les écrans » refusé), zone, durée, cadence ; vérifié à l'ouverture **et à chaque lecture** (`test_consent_is_rechecked_on_every_read`, mutation vérifiée) |
+| Cadence plafonnée | ✅ | la lecture se bloque pour respecter `max_fps` ; l'attente ne peut pas survivre à l'expiration du consentement |
+| Arrêt d'urgence | ✅ | `KillSwitch` vérifié avant chaque capture (mutation vérifiée) ; actif jusqu'à `reset()` explicite |
+| Piste d'audit de capture | 🟡 | journaux `capture_opened` / `capture_closed` (auteur, finalité, zone, nombre d'images), **jamais de pixels** (testé). Journal local, pas encore centralisé |
+| Aucun contournement d'anti-cheat, accès mémoire, injection, ni dissimulation | 🟡 | tenu **par conception** (seule capture d'écran de l'OS) ; l'interdiction sera encodée dans la validation du manifeste de plugin (📐). Aucun contrôle technique ne peut garantir qu'un tiers n'ajoute pas un backend illicite |
+| Traitement local, pas d'envoi systématique d'images vers le cloud | ✅ | aucune dépendance réseau dans le paquet ; rien n'est écrit ni émis sans appel explicite (`record_frames`) |
+| Contrôle de souris / clavier / manette, mode supervisé, permissions d'actions | 📐 | **non construit** : le module ne peut rien faire dans un jeu |
+| Modèles ONNX non fiables | 📐 | un `.onnx` est un graphe exécuté par ONNX Runtime : provenance à maîtriser ; aucune vérification de signature |
+| Licence des modèles (AGPL-3.0 d'Ultralytics) | ⚠️ décision requise | le paquet n'en dépend pas ; son usage dans un SaaS commercial doit être tranché |
+
+**Cadre d'usage** : jeux de l'utilisateur, jeux solo, environnements de test, serveurs privés, intégrations multijoueurs
+expressément autorisées. De nombreux jeux en ligne interdisent toute automatisation, y compris par capture d'écran :
+la plateforme ne peut pas juger les conditions d'un jeu, la responsabilité d'usage reste à l'utilisateur.
+
 ## Risques acceptés
 
 | Risque | Décision |

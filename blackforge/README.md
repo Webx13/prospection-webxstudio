@@ -2,7 +2,7 @@
 
 Plateforme SaaS de création, de test et d'exécution isolée de bots, scripts, agents IA et automatisations.
 
-> **État : Phase 2 terminée (socle technique).** Ce dépôt contient une API FastAPI, une base
+> **État : Phase 2 terminée (socle technique) + prototype de perception Gaming AI.** Ce dépôt contient une API FastAPI, une base
 > PostgreSQL migrée, une interface Next.js et l'outillage Docker. Les fonctionnalités produit
 > (AI Builder, Visual Builder, Code Studio, runtime, agent local…) **ne sont pas encore construites** :
 > voir la [feuille de route](docs/02-ROADMAP.md) pour l'état réel de chaque phase.
@@ -34,10 +34,23 @@ Ou toute la pile en conteneurs : `make up` (db + migrations + api + web), `make 
 
 `make help` liste toutes les commandes.
 
+## Gaming AI (prototype de perception)
+
+Capture d'écran soumise à consentement + détection visuelle, indépendants de l'API. **Rien n'agit sur un jeu.**
+
+```bash
+make gaming-probe                                            # capacités réelles de votre machine
+make gaming-selfcheck ARGS="--i-consent --out ~/check.png"   # capture UNE image de votre écran
+make test-gaming                                             # 105 tests (écran réel : Linux + Xvfb + Chromium)
+```
+
+Jamais exécuté sur Mac à ce jour : lancez ces trois commandes et signalez le résultat. Détails, mesures et limites :
+[docs/04-GAMING-ARCHITECTURE.md](docs/04-GAMING-ARCHITECTURE.md).
+
 ## Vérifier que tout fonctionne
 
 ```bash
-make test      # API (43 tests, dont intégration sur PostgreSQL réel) + web (25 tests)
+make test      # API (43 tests, dont intégration sur PostgreSQL réel) + web (25) + gaming (105)
 make lint      # ruff, mypy strict, eslint, tsc
 ```
 
@@ -58,7 +71,9 @@ blackforge/
 ├── apps/
 │   ├── api/    FastAPI · Pydantic v2 · SQLAlchemy 2 async · Alembic · PostgreSQL
 │   └── web/    Next.js 16 · React 19 · Tailwind 4 · TypeScript strict
-├── docs/       audit, architecture, feuille de route, sécurité
+├── packages/
+│   └── gaming/ Gaming AI : capture d'écran (consentement), vision, perception (prototype)
+├── docs/       audit, architecture, feuille de route, sécurité, architecture gaming
 ├── docker-compose.yml
 ├── Makefile
 └── .env.example

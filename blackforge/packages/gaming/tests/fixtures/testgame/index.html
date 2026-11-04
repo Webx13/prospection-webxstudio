@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>BLACKFORGE — jeu de test</title>
+<!--
+  Jeu de test minimal, écrit pour BLACKFORGE (aucun jeu tiers) : il dessine une scène décrite par
+  l'URL, donc la vérité terrain est connue exactement.
+    #a=<scène JSON>            scène initiale
+    &b=<scène JSON>&delay=<ms> scène affichée après `delay` ms (test de détection de changement)
+  Éléments : {"t":"rect","x","y","w","h","c"} · {"t":"text","x","y","s","c"} ·
+             {"t":"pixels","x","y","w","h","rgba":"<base64>"} (pixels exacts, sans lissage)
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #101018; overflow: hidden; cursor: none; }
+  canvas { display: block; }
+</style>
+<canvas id="c"></canvas>
+<script>
+  const params = new URLSearchParams(location.hash.slice(1));
+  const sceneA = JSON.parse(params.get("a") || "[]");
+  const sceneB = params.get("b") ? JSON.parse(params.get("b")) : null;
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  let current = sceneA;
+
+  function draw(scene) {
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#101018";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (const item of scene) {
+      if (item.t === "rect") {
+        ctx.fillStyle = item.c;
+        ctx.fillRect(item.x, item.y, item.w, item.h);
+      } else if (item.t === "text") {
+        ctx.fillStyle = item.c || "#ffffff";
+        ctx.font = "20px monospace";
+        ctx.fillText(item.s, item.x, item.y);
+      } else if (item.t === "pixels") {
+        const bytes = Uint8ClampedArray.from(atob(item.rgba), (ch) => ch.charCodeAt(0));
+        ctx.putImageData(new ImageData(bytes, item.w, item.h), item.x, item.y);
+      }
+    }
+  }
+
+  draw(current);
+  addEventListener("resize", () => draw(current));
+  if (sceneB) {
+    setTimeout(() => {
+      current = sceneB;
+      draw(current);
+    }, Number(params.get("delay") || "1500"));
+  }
+</script>

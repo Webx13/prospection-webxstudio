@@ -7,15 +7,16 @@ export
 
 COMPOSE := docker compose
 
-.PHONY: help setup check-env db-up db-down db-reset migrate api web test test-api test-web lint up down
+.PHONY: help setup check-env db-up db-down db-reset migrate api web test test-api test-web test-gaming lint up down gaming-probe gaming-selfcheck
 
 help: ## Affiche cette aide
-	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*## "} {printf "  %-16s %s\n", $$1, $$2}'
 
-setup: ## Crée .env (mot de passe aléatoire) et installe les dépendances API + web
+setup: ## Crée .env (mot de passe aléatoire) et installe les dépendances API + web + gaming
 	@test -f .env || { pw=$$(openssl rand -hex 16) && sed "s/__GENERATE__/$$pw/g" .env.example > .env && echo ".env créé avec un mot de passe aléatoire"; }
 	cd apps/api && uv sync
 	cd apps/web && npm ci
+	cd packages/gaming && uv sync --all-extras
 
 check-env:
 	@test -f .env || { echo "✗ .env manquant : lancez 'make setup'"; exit 1; }
@@ -41,7 +42,7 @@ api: check-env ## Lance l'API en natif avec rechargement (http://127.0.0.1:8000)
 web: ## Lance l'interface en natif (http://localhost:3000)
 	cd apps/web && npm run dev
 
-test: test-api test-web ## Lance tous les tests
+test: test-api test-web test-gaming ## Lance tous les tests
 
 test-api: db-up ## Tests de l'API (unitaires + intégration sur PostgreSQL réel)
 	cd apps/api && uv run pytest
@@ -49,9 +50,19 @@ test-api: db-up ## Tests de l'API (unitaires + intégration sur PostgreSQL réel
 test-web: ## Tests de l'interface
 	cd apps/web && npm test
 
-lint: ## Lint + typage strict (API et web)
+test-gaming: ## Tests Gaming AI (le test d'écran réel s'ignore sans Xvfb + Chromium)
+	cd packages/gaming && uv run pytest
+
+gaming-probe: ## Capacités RÉELLES de cette machine (capture, OpenCV, accélérateurs)
+	cd packages/gaming && uv run blackforge-gaming probe
+
+gaming-selfcheck: ## Capture UNE image de votre écran. Usage : make gaming-selfcheck ARGS="--i-consent --out /tmp/c.png"
+	cd packages/gaming && uv run blackforge-gaming selfcheck-capture $(ARGS)
+
+lint: ## Lint + typage strict (API, web et gaming)
 	cd apps/api && uv run ruff check . && uv run ruff format --check . && uv run mypy
 	cd apps/web && npm run lint && npm run typecheck
+	cd packages/gaming && uv run ruff check . && uv run ruff format --check . && uv run mypy
 
 up: check-env ## Lance toute la pile en conteneurs (db + migrations + api + web)
 	$(COMPOSE) --profile full up --build

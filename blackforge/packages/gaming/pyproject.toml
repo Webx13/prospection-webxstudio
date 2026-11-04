@@ -1,0 +1,64 @@
+[project]
+name = "blackforge-gaming"
+version = "0.1.0"
+description = "BLACKFORGE Gaming AI — moteurs de capture, de perception et (à venir) de décision pour agents de jeu."
+readme = "README.md"
+requires-python = ">=3.12"
+# Le cœur ne dépend que de numpy et pydantic : chaque moteur lourd est un extra optionnel.
+dependencies = [
+  "numpy>=2.0,<3",
+  "pydantic>=2.14,<3",
+]
+
+[project.optional-dependencies]
+capture = ["mss>=10,<11"]
+vision = ["opencv-python-headless>=4.12,<5"]
+onnx = ["onnxruntime>=1.20,<2"]
+
+[dependency-groups]
+dev = [
+  "pytest>=9,<10",
+  "ruff>=0.17,<1",
+  "mypy>=2.4,<3",
+  # Pour fabriquer des modèles ONNX minuscules dans les tests (aucun poids pré-entraîné).
+  "onnx>=1.17,<2",
+]
+
+[project.scripts]
+blackforge-gaming = "blackforge_gaming.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blackforge_gaming"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "display: nécessite Xvfb + Chromium (capture d'écran réelle sur un affichage virtuel)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF", "NPY"]
+ignore = ["S101", "E501"]  # E501 : le formateur gère le code ; commentaires français longs tolérés
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["mss", "mss.*", "cv2", "onnxruntime", "onnx", "onnx.*"]
+ignore_missing_imports = true
